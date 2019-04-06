@@ -1,10 +1,11 @@
 package com.uf.cn.p2p.utils;
 
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
+import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.BitSet;
@@ -106,7 +107,12 @@ public class MessageUtil {
 			// Send the required piece.
 			// Piece Message is 4byte index + the content
 			byte[] pieceReqInBytes = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(pieceRequired).array();
-			byte[] payLoad = Files.readAllBytes(FileUtil.getFilePath(hostPeer.getPeerId(), pieceRequired));
+			Path p = FileUtil.getFilePath(hostPeer.getPeerId(), pieceRequired);
+			if (hostPeer.hasFile() && Files.notExists(p, LinkOption.NOFOLLOW_LINKS)) {
+				remotePeer.setInterested(true);
+				return;
+			}
+			byte[] payLoad = Files.readAllBytes(p);
 			LogUtil.logInfo("Sending the piece " + pieceRequired + " to " + remotePeer.getPeerId());
 			ByteBuffer reqMsgPayload = ByteBuffer.allocate(pieceReqInBytes.length + payLoad.length);
 			reqMsgPayload.put(pieceReqInBytes, 0, pieceReqInBytes.length);
