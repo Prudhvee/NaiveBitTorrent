@@ -2,14 +2,20 @@ package com.uf.cn.p2p.services;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
+import java.io.EOFException;
 import java.io.IOException;
+import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.BitSet;
 import java.util.Vector;
+import java.util.concurrent.CopyOnWriteArrayList;
 
+import com.uf.cn.p2p.model.Handshake;
 import com.uf.cn.p2p.model.Message;
 import com.uf.cn.p2p.model.MessageType;
 import com.uf.cn.p2p.model.Peer;
+import com.uf.cn.p2p.utils.LogUtil;
 import com.uf.cn.p2p.utils.MessageUtil;
 
 //Service for communication between the peers
@@ -17,17 +23,14 @@ public class MessagingService {
 
 	Peer hostPeer;
 	Peer remotePeer;
-	Vector<Peer> neighbors;
-	DataInputStream inStream;
-	DataOutputStream outStream;
+	CopyOnWriteArrayList<Peer> neighbors;
+	//MessageUtil msgUtil;
 
-	public MessagingService(Peer hostPeer, Peer remote, Vector<Peer> neighbors, DataInputStream inStream,
-			DataOutputStream outStream) {
+	public MessagingService(Peer hostPeer, Peer remote, CopyOnWriteArrayList<Peer> neighbors2) {
 		this.hostPeer = hostPeer;
 		this.remotePeer = remote;
-		this.neighbors = neighbors;
-		this.inStream = inStream;
-		this.outStream = outStream;
+		this.neighbors = neighbors2;
+		//msgUtil = new MessageUtil();
 	}
 
 	// Start listening to the messages and respond accordingly
@@ -36,43 +39,54 @@ public class MessagingService {
 
 		while (true) {
 			try {
-				message = readMessage(inStream);
+				try {
+					LogUtil.logInfo(remotePeer.getIn().available() + " Waiting for the message at the peer "
+							+ remotePeer.getPeerId());
+					message = readMessage(remotePeer.getIn());
+				} catch (EOFException e) {
+					e.printStackTrace();
+					LogUtil.logInfo("Socket Closed++++++++++++++++++++++++++" + e.getMessage());
+					break;
+				} catch (SocketException e) {
+					e.printStackTrace();
+					LogUtil.logInfo("Socket exception received+++++++++++++++++++++++++" + e.getMessage());
+					break;
+				}
 
 				switch (message.getMessageType()) {
 				case choke:
-					System.out.println("Choke recieved");
+					LogUtil.logchokeunchoke(hostPeer.getPeerId(), remotePeer.getPeerId(), "choked");
 					remotePeer.setChoked(true);
-					// TODO Log choked
 					break;
 				case unchoke:
-					System.out.println("unchoke recieved");
+					LogUtil.logchokeunchoke(hostPeer.getPeerId(), remotePeer.getPeerId(), "unchoked");
 					remotePeer.setChoked(false);
 					// Send Reqeusts if any filePieces are needed
-					MessageUtil.sendRequestMessage(hostPeer, remotePeer, outStream);
+					MessageUtil.sendRequestMessage(hostPeer, remotePeer);
 					break;
 				case interested:
+					LogUtil.logInterested(hostPeer.getPeerId(), remotePeer.getPeerId(), true);
 					MessageUtil.interestedRcvd(remotePeer);
 					break;
 				case notInterested:
-					System.out.println("Not interested received");
+					LogUtil.logInterested(hostPeer.getPeerId(), remotePeer.getPeerId(), false);
 					remotePeer.setInterested(false);
 					break;
 				case have:
-					MessageUtil.haveRcvd(message, hostPeer, outStream);
+					MessageUtil.haveRcvd(message, hostPeer, remotePeer);
 					break;
 				case bitField:
-					remotePeer.setBitField(MessageUtil.bitFieldRcvd(message, hostPeer.getBitField(), outStream));
+					MessageUtil.bitFieldRcvd(message, hostPeer, remotePeer);
 					break;
 				case request:
-					System.out.println("Request received");
 					MessageUtil.requestRcvd(hostPeer, remotePeer,
-							ByteBuffer.wrap(message.getMessagePayLoad()).order(ByteOrder.BIG_ENDIAN).getInt(),
-							outStream);
+							ByteBuffer.wrap(message.getMessagePayLoad()).order(ByteOrder.BIG_ENDIAN).getInt());
 					break;
 				case piece:
-					Integer pieceRcvd = MessageUtil.pieceRcvd(message, hostPeer);
-					MessageUtil.sendRequestMessage(hostPeer, remotePeer, outStream);
-					MessageUtil.broadcastHave(neighbors, pieceRcvd);
+					Integer pieceRcvd = MessageUtil.pieceRcvd(message, hostPeer, remotePeer);
+					MessageUtil.sendRequestMessage(hostPeer, remotePeer);
+					if (pieceRcvd != null)
+						MessageUtil.broadcastHave(neighbors, pieceRcvd);
 					break;
 				}
 
@@ -80,29 +94,53 @@ public class MessagingService {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
+
 		}
+
+		LogUtil.logInfo("Leaving the while loop " + remotePeer.getPeerId());
 	}
 
-	private Message readMessage(DataInputStream inStream) throws IOException {
+	private Message readMessage(DataInputStream inStream) throws IOException, SocketException {
+		LogUtil.logInfo("reading 4 bytes from " + remotePeer.getPeerId());
 		Integer messageLength = inStream.readInt();
-		MessageType type_ = MessageType.getType(inStream.readByte());
+		LogUtil.logInfo("read 4 bytes from " + remotePeer.getPeerId() + "---" + messageLength);
+		LogUtil.logInfo("reading a byte from the " + remotePeer.getPeerId());
+		byte b = inStream.readByte();
+		LogUtil.logInfo("read 1 byte from " + remotePeer.getPeerId() + "---" + b);
+		MessageType type_ = MessageType.getType(b);
 		byte[] message = null;
 		// Initialize the array if the length > 0
 		if (messageLength > 1) {
 			// Read the payload fromthe stream.
 			message = new byte[messageLength - 1];
-			
-			long start = System.nanoTime();
-			inStream.readFully(message);
-			long end = System.nanoTime();
-			
-			if(type_ == MessageType.piece)
-			{
-				remotePeer.setDownLoadSpeed(messageLength/(end - start));
+
+			inStream.read(message);
+
+			if (type_ == MessageType.piece) {
+				remotePeer.setDownLoadSpeed(remotePeer.getDownLoadSpeed() + new Long(messageLength));
 			}
 
-			
 		}
 		return new Message(message, type_);
 	}
+
+	synchronized public void sendMessage(Message msg) throws IOException, SocketException {
+		// messageLength = messagePayLoad.length + 1;
+		remotePeer.getOut().writeInt(msg.getMessageLength());
+		LogUtil.logInfo("Wriring the message " + msg.getMessageLength());
+		remotePeer.getOut().writeByte(msg.getMessageType().getType());
+		LogUtil.logInfo("Written the message of type" + msg.getMessageType().getType());
+		if (msg.getMessagePayLoad() != null && msg.getMessagePayLoad().length > 0)
+			remotePeer.getOut().write(msg.getMessagePayLoad());
+
+		LogUtil.logInfo("Message payload--" + msg.getMessageLength());
+		remotePeer.getOut().flush();
+	}
+
+	public void sendBitField(BitSet hostBitSet) throws IOException {
+		Message bitFieldMsg = new Message(hostBitSet.isEmpty() ? null : hostBitSet.toByteArray(), MessageType.bitField);
+		// bitFieldMsg.sendMessage(out);
+		sendMessage(bitFieldMsg);
+	}
+
 }

@@ -18,50 +18,17 @@ public class FileUtil {
 
 	public static String path = System.getProperty("user.dir") + "/src/";
 
-	public static byte[] fileToByteStream(String fileName) {
-		try {
-			String path = System.getProperty("user.dir");
-			path += "/src/" + fileName;
-
-			Path p = Paths.get(path);
-			byte[] fileBytes = Files.readAllBytes(p);
-			return fileBytes;
-		} catch (IOException ex) {
-			System.out.println("Cannot find the file at the location");
-		}
-
-		return null;
-	}
-
-	public static FilePiece[] breakIntoPieces(byte[] data) throws Exception {
-		FilePiece[] filePiece = new FilePiece[CommonConfigModel.getNumOfPieces()];
-		if (data == null)
-			return filePiece;
-
-		for (int i = 0; i < filePiece.length; i++)
-			filePiece[i] = new FilePiece();
-		byte[] piece;
-		int index = 0;
-		for (int i = 0; i < filePiece.length; i++) {
-			piece = new byte[CommonConfigModel.getPieceSize()];
-			for (int j = 0; j < CommonConfigModel.getPieceSize() && index < data.length; j++) {
-				piece[j] = data[index++];
-			}
-			filePiece[i] = new FilePiece(piece);
-		}
-
-		return filePiece;
-	}
-
 	public static void MergeTheFileIfWeCan(Peer hostPeer) throws IOException {
 		// If the number of bits set in bitfield is equal to the filePieces.length,
 		// Then, I think we received all the pieces and ready to merge
+		LogUtil.logInfo("Cardinality of the set " + hostPeer.getBitField().cardinality());
+		LogUtil.logInfo("Number of pieces" + CommonConfigModel.getNumOfPieces());
+		LogUtil.logInfo("BitSet" + hostPeer.getBitField().nextClearBit(0));
 		if (hostPeer.getBitField().cardinality() == CommonConfigModel.getNumOfPieces()) {
 
 			File outFile = new File(
 					FileUtil.getDirectoryPath(hostPeer.getPeerId()) + "/" + CommonConfigModel.getFileName());
 			FileOutputStream fos = new FileOutputStream(outFile);
-
 			Path p;
 			for (int i = 0; i < CommonConfigModel.getNumOfPieces(); i++) {
 				p = FileUtil.getFilePath(hostPeer.getPeerId(), i);
@@ -70,7 +37,8 @@ public class FileUtil {
 				// Delete ith Piece
 				//Files.delete(p);
 			}
-
+			LogUtil.logDownloaded(hostPeer.getPeerId());
+			hostPeer.setHasFile(true);
 			fos.flush();
 			fos.close();
 
@@ -92,13 +60,11 @@ public class FileUtil {
 		int piece = 0;
 		String pieceName;
 		while (fileLength > 0) {
-			System.out.println("--" + fileLength);
 			// Read the bytes into the array
 			pieceBytes = new byte[fileLength > CommonConfigModel.getPieceSize() ? CommonConfigModel.getPieceSize()
 					: fileLength];
 			int read = fis.read(pieceBytes);
 			fileLength -= read;
-			System.out.println("**" + fileLength);
 			pieceName = path + "/" + peerId + "/" + "piece" + piece++;
 
 			fos = new FileOutputStream(new File(pieceName));
@@ -129,6 +95,12 @@ public class FileUtil {
 			file.mkdir();
 		}
 
+	}
+
+	public static void deleteParts(Integer peerId) throws IOException {
+		for(int i=0; i<CommonConfigModel.getNumOfPieces();i++)
+			Files.delete(getFilePath(peerId, i));
+		
 	}
 
 }

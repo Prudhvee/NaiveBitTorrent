@@ -8,43 +8,46 @@ import java.net.Socket;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.Vector;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import com.uf.cn.p2p.model.CommonConfigModel;
+import com.uf.cn.p2p.model.Handshake;
 import com.uf.cn.p2p.model.Peer;
+import com.uf.cn.p2p.utils.FileUtil;
+import com.uf.cn.p2p.utils.LogUtil;
 import com.uf.cn.p2p.utils.MessageUtil;
 
 public class PeerListenerService extends Thread {
 
 	private Peer hostPeer;
-	private Vector<Peer> neighbors;
+	private CopyOnWriteArrayList<Peer> neighbors;
 	private Vector<Peer> allPeers;
+	static ServerSocket listener;
+	static Timer timer;
 
-	PeerListenerService(Peer host, Vector<Peer> remotePeers, Vector<Peer> connectedPeers) throws IOException {
+	PeerListenerService(Peer host, Vector<Peer> remotePeers, CopyOnWriteArrayList<Peer> connectedPeers)
+			throws IOException {
 		hostPeer = host;
 		allPeers = remotePeers;
 		neighbors = connectedPeers;
+		listener = new ServerSocket(hostPeer.getPort());
 	}
 
 	@Override
 	public void run() {
 
-		ServerSocket listener = null;
 		try {
 			// Start the schedulers.
-			startSchedulers();
-			System.out.println("After the schedulers**************");
-			System.out.println("Starting the server at " + hostPeer.getPort());
-			listener = new ServerSocket(hostPeer.getPort());
+			timer = new Timer();
+			startSchedulers(timer);
 			while (true) {
 				new Handler(listener.accept()).start();
 			}
 		} catch (IOException ex) {
-			ex.printStackTrace();
+			System.out.println("Server Socket closed");
 		} finally {
 			try {
-				listener.close();
+				closeServer(hostPeer.getPeerId());
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -52,18 +55,16 @@ public class PeerListenerService extends Thread {
 
 	}
 
-	private void startSchedulers() {
+	private void startSchedulers(Timer timer) {
 		// // Start the scheduler to select the K random neighbors
-		TimerTask schedService = new UnchokeScheduler(neighbors, hostPeer.getPeerId(),
+		TimerTask schedService = new UnchokeScheduler(neighbors, hostPeer,
 				CommonConfigModel.getNumOfPrefNeighbors());
-		Timer timer = new Timer();
 		timer.scheduleAtFixedRate(schedService, 0, CommonConfigModel.getUnchokingInterval() * 1000);
 
 		// Scheduler to optimistically unchoke a neighbor
 		TimerTask optimisticSched = new OptmisticUnchokeScheduler(neighbors, hostPeer.getPeerId());
-		//Timer Optimistictimer = new Timer();
-		timer.scheduleAtFixedRate(optimisticSched, 0,
-				CommonConfigModel.getOptismisticUnchokingInterval() * 1000);
+		// Timer Optimistictimer = new Timer();
+		timer.scheduleAtFixedRate(optimisticSched, 0, CommonConfigModel.getOptismisticUnchokingInterval() * 1000);
 
 	}
 
@@ -89,7 +90,7 @@ public class PeerListenerService extends Thread {
 				// out.flush();
 				in = new DataInputStream(connection.getInputStream());
 				// wait for handshake
-				Integer remotePeerId = MessageUtil.waitForHandshakeAndSendReponse(in, out, hostPeer.getPeerId());
+				Integer remotePeerId = waitForHandshakeAndSendReponse(in, out, hostPeer.getPeerId());
 
 				// Constructing the remote peer.
 				for (Peer remote : allPeers) {
@@ -98,15 +99,16 @@ public class PeerListenerService extends Thread {
 						break;
 					}
 				}
+				LogUtil.receivedTCP(hostPeer.getPeerId(), remote.getPeerId());
 				remote.setOut(out);
+				remote.setIn(in);
 				remote.setSoc(connection);
-				neighbors.addElement(remote);
-				System.out.println("Sending the bitFiled message" + hostPeer.getBitField().toString());
-				MessageUtil.sendBitField(out, hostPeer.getBitField());
-
-				MessagingService msgService = new MessagingService(hostPeer, remote, neighbors, in, out);
-
-				msgService.startService();
+				// MessageUtil.sendBitField(out, hostPeer.getBitField());
+				neighbors.add(remote);
+				MessagingService msgService = new MessagingService(hostPeer, remote, neighbors);
+				remote.setService(msgService);
+				remote.getService().sendBitField(hostPeer.getBitField());
+				remote.getService().startService();
 
 			} catch (IOException ioException) {
 				System.out.println("Disconnect with Client ");
@@ -116,25 +118,48 @@ public class PeerListenerService extends Thread {
 			} finally {
 				// Close connections
 				try {
-					in.close();
-					out.close();
-					connection.close();
-				} catch (IOException ioException) {
+					LogUtil.logInfo("Removing from the neighbors " + remote.getPeerId());
+					allPeers.remove(remote);
+					neighbors.remove(remote);
+					if (neighbors.size() == 0)
+						closeServer(hostPeer.getPeerId());
+					// in.close();
+					// out.close();
+					LogUtil.receivedClose(hostPeer.getPeerId(), remote.getPeerId());
+					// connection.close();
+				} catch (Exception ioException) {
 					ioException.printStackTrace();
 					System.out.println("Disconnect with Client ");
 				}
 			}
 		}
+		/*
+		 * // send a message to the output stream public void sendMessage(String msg) {
+		 * try { // out.write(msg); out.flush(); System.out.println("Send message: " +
+		 * msg); } catch (IOException ioException) { ioException.printStackTrace(); } }
+		 */
 
-		// send a message to the output stream
-		public void sendMessage(String msg) {
-			try {
-				// out.write(msg);
-				out.flush();
-				System.out.println("Send message: " + msg);
-			} catch (IOException ioException) {
-				ioException.printStackTrace();
+		private Integer waitForHandshakeAndSendReponse(DataInputStream in, DataOutputStream out, Integer peerId)
+				throws IOException, InterruptedException {
+			Handshake hnd = new Handshake();
+			while (true) {
+				if (hnd.readAndValidateHandshakeByteMessage(in, null))
+					break;
 			}
+			System.out.println("received handshake and sending one" + peerId);
+			Handshake outMsg = new Handshake(peerId);
+			outMsg.sendHandshake(out);
+			return hnd.getPeerId();
+		}
+
+	}
+
+	public static void closeServer(Integer peerId) throws IOException {
+
+		if (!listener.isClosed()) {
+			FileUtil.deleteParts(peerId);
+			listener.close();
+			timer.cancel();
 		}
 
 	}

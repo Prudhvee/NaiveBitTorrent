@@ -1,8 +1,11 @@
 package com.uf.cn.p2p.model;
 
+import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.net.Socket;
 import java.util.BitSet;
+
+import com.uf.cn.p2p.services.MessagingService;
 
 public class Peer {
 	private Integer peerId;
@@ -12,21 +15,23 @@ public class Peer {
 	private boolean hasFile;
 	private BitSet bitField;
 	private DataOutputStream out;
+	private DataInputStream in;
 	private Socket soc;
-	
+
 	private boolean isChoked = true;
 	private boolean isOptimisticallyUnchoked = false;
 	private boolean isInterested = false;
-	private long downLoadSpeed; 
+	private Long downLoadSpeed;
 	private BitSet requestedBitSet;
-	
-	public Peer( Integer index, Integer peerId, String hostName, Integer port, boolean hasFile) {
+	private MessagingService service;
+
+	public Peer(Integer index, Integer peerId, String hostName, Integer port, boolean hasFile) {
 		this.peerId = peerId;
 		this.index = index;
 		this.hostName = hostName;
 		this.port = port;
 		this.hasFile = hasFile;
-		this.downLoadSpeed = 0;
+		this.downLoadSpeed = new Long(0);
 	}
 
 	public Integer getPeerId() {
@@ -82,7 +87,6 @@ public class Peer {
 	}
 
 	public synchronized void setChoked(boolean isChoked) {
-		System.out.println("Setting the unchoked");
 		this.isChoked = isChoked;
 	}
 
@@ -94,11 +98,11 @@ public class Peer {
 		this.isInterested = isInterested;
 	}
 
-	public long getDownLoadSpeed() {
+	public Long getDownLoadSpeed() {
 		return downLoadSpeed;
 	}
 
-	public void setDownLoadSpeed(long l) {
+	public void setDownLoadSpeed(Long l) {
 		this.downLoadSpeed = l;
 	}
 
@@ -110,7 +114,7 @@ public class Peer {
 		this.isOptimisticallyUnchoked = isOptimisticallyUnchoked;
 	}
 
-	public DataOutputStream getOut() {
+	synchronized public DataOutputStream getOut() {
 		return out;
 	}
 
@@ -133,31 +137,42 @@ public class Peer {
 	public void setSoc(Socket soc) {
 		this.soc = soc;
 	}
-	
-	
-	synchronized public boolean getBitFieldValue(int index)
-	{
+
+	synchronized public boolean getBitFieldValue(int index) {
 		return bitField.get(index);
 	}
-	
-	synchronized public void setBitFieldValue(int index)
-	{
-		bitField.set(index);
-	}
-	
 
-	synchronized public boolean getRequestedBitSetVal(int index)
-	{
+	synchronized public void setBitFieldValue(int index, boolean val) {
+		bitField.set(index, val);
+	}
+
+	synchronized public boolean getRequestedBitSetVal(int index) {
 		return requestedBitSet.get(index);
 	}
-	
-	synchronized public void setRequestedBitSetVal(int index, boolean val)
-	{
+
+	synchronized public void setRequestedBitSetVal(int index, boolean val) {
 		requestedBitSet.set(index, val);
 	}
 
-	synchronized public void flipBitField()
-	{
-		
+	@Override
+	public String toString() {
+		return this.peerId + "";
 	}
+
+	public MessagingService getService() {
+		return service;
+	}
+
+	public void setService(MessagingService service) {
+		this.service = service;
+	}
+
+	public DataInputStream getIn() {
+		return in;
+	}
+
+	public void setIn(DataInputStream in) {
+		this.in = in;
+	}
+
 }

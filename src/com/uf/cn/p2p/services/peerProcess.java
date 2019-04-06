@@ -1,18 +1,13 @@
 package com.uf.cn.p2p.services;
 
 import java.util.BitSet;
-import java.util.Timer;
-import java.util.TimerTask;
 import java.util.Vector;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-
-import org.omg.CORBA.CODESET_INCOMPATIBLE;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import com.uf.cn.p2p.model.CommonConfigModel;
 import com.uf.cn.p2p.model.Peer;
 import com.uf.cn.p2p.utils.ConfigParseUtil;
-import com.uf.cn.p2p.utils.FileUtil;
+import com.uf.cn.p2p.utils.LogUtil;
 
 public class peerProcess {
 	public static void main(String[] args) throws Exception {
@@ -22,42 +17,33 @@ public class peerProcess {
 		}
 		Integer peerId = Integer.parseInt(args[0]);
 		Vector<Peer> remotePeers = new Vector<>();
-		Peer peer;
 		// First parse the config files
+
+		// INitialize the Logger for the peer
+		LogUtil.createLogger(peerId);
 
 		ConfigParseUtil.parseCommonConfig();
 		remotePeers = ConfigParseUtil.parsePeerConfig();
-
+		System.out.println("remote peers length" + remotePeers.size());
 		Peer currPeer = getCurrPeerDetails(remotePeers, peerId);
-
 		// If the current peer has file, initialize the file bits to the peer and
 		// populate the pieces.
-		System.out.println(CommonConfigModel.getFileSize());
-		System.out.println(CommonConfigModel.getPieceSize());
-		System.out.println(CommonConfigModel.getNumOfPieces());
-		
-		
-		BitSet bitSet = new BitSet(CommonConfigModel.getNumOfPieces());
 		BitSet requested = new BitSet(CommonConfigModel.getNumOfPieces());
-		if (currPeer.hasFile())
-		{
-			bitSet.set(0, CommonConfigModel.getNumOfPieces(), true);
-			FileUtil.breakIntoPieces(peerId);
-			
-		}
-		else
-		{
-			bitSet.set(0, CommonConfigModel.getNumOfPieces(), false);
+		BitSet bitField = new BitSet(CommonConfigModel.getNumOfPieces());
+		if (currPeer.hasFile()) {
+			bitField.set(0, CommonConfigModel.getNumOfPieces(), true);
+			FileParsingThread pthread = new FileParsingThread(peerId);
+			pthread.start();
+
 		}
 		requested.set(0, CommonConfigModel.getNumOfPieces(), false);
-		currPeer.setBitField(bitSet);
 		currPeer.setRequestedBitSet(requested);
+		currPeer.setBitField(bitField);
+		// currPeer.setFilePieces(FileUtil.breakIntoPieces(FileUtil.fileToByteStream(peerId+"/"+CommonConfigModel.getFileName())));
 
-		//currPeer.setFilePieces(FileUtil.breakIntoPieces(FileUtil.fileToByteStream(peerId+"/"+CommonConfigModel.getFileName())));
-		
-		//Vector common between server and listener to store the connected peers
-		Vector<Peer> connectedPeers = new Vector<Peer>();
-		
+		// Vector common between server and listener to store the connected peers
+		CopyOnWriteArrayList<Peer> connectedPeers = new CopyOnWriteArrayList<Peer>();
+
 		// IF the index is zero, then the node just accepts the requests
 		// else, it listens for the requests and sends the request to the previous peers
 		if (currPeer.getIndex() != 0) {
@@ -70,11 +56,11 @@ public class peerProcess {
 		PeerListenerService peerListener = new PeerListenerService(currPeer, remotePeers, connectedPeers);
 		peerListener.start();
 		// Call the service to listen for the requests
-
 	}
 
 	private static Peer getCurrPeerDetails(Vector<Peer> remotePeers, Integer peerId) {
 		for (Peer peer : remotePeers) {
+			System.out.println(peer.getPeerId());
 			if (peer.getPeerId().equals(peerId))
 				return peer;
 		}
