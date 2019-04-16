@@ -33,6 +33,7 @@ public class peerProcess {
 		if (currPeer.hasFile()) {
 			bitField.set(0, CommonConfigModel.getNumOfPieces(), true);
 			FileParsingThread pthread = new FileParsingThread(peerId);
+			pthread.setPriority(10);
 			pthread.start();
 
 		}

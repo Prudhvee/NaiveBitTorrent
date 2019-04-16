@@ -154,7 +154,7 @@ public class PeerListenerService extends Thread {
 
 	}
 
-	public static void closeServer(Integer peerId) throws IOException {
+	synchronized public static void closeServer(Integer peerId) throws IOException {
 
 		if (!listener.isClosed()) {
 			FileUtil.deleteParts(peerId);

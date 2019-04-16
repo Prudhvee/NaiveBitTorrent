@@ -28,7 +28,7 @@ public class LogUtil {
 	}
 
 	public static void logInfo(String logMsg) {
-		logger.info(logMsg);
+		//logger.info(logMsg);
 	}
 
 	public static void logMakeTCP(Integer peer1, Integer peer2) {
