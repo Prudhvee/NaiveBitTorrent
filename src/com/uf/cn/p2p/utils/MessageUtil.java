@@ -25,7 +25,7 @@ public class MessageUtil {
 		return MessageType.getType(message[4]);
 	}
 
-	public static void bitFieldRcvd(Message message, Peer host, Peer remote) throws IOException {
+	public static void bitFieldRcvd(Message message, Peer host, Peer remote) throws Exception {
 
 		// If the payLoad is null, we are not interested
 		if (message.getMessagePayLoad() == null) {
@@ -65,7 +65,7 @@ public class MessageUtil {
 
 	}
 
-	public static void sendRequestMessage(Peer hostPeer, Peer remotePeer) throws IOException {
+	public static void sendRequestMessage(Peer hostPeer, Peer remotePeer) throws Exception {
 		// Find next piece that is needed.
 		Integer nextPieceNeeded = findNextPieceNeeded(hostPeer, remotePeer);
 		LogUtil.logInfo("Requesting  " + remotePeer.getPeerId() + " piece " + nextPieceNeeded);
@@ -98,7 +98,7 @@ public class MessageUtil {
 
 	}
 
-	public static void requestRcvd(Peer hostPeer, Peer remotePeer, Integer pieceRequired) throws IOException {
+	public static void requestRcvd(Peer hostPeer, Peer remotePeer, Integer pieceRequired) throws Exception {
 		LogUtil.logRequetRcvd(hostPeer.getPeerId(), remotePeer.getPeerId(), pieceRequired);
 		// check if the peer is not choked
 		LogUtil.logInfo(
@@ -156,7 +156,7 @@ public class MessageUtil {
 				.start();
 	}
 
-	public static void haveRcvd(Message message, Peer hostPeer, Peer remotePeer) throws IOException {
+	public static void haveRcvd(Message message, Peer hostPeer, Peer remotePeer) throws Exception {
 		// Get the piece index from the message
 		Integer pieceIndex = ByteBuffer.wrap(message.getMessagePayLoad()).getInt();
 		LogUtil.logHave(hostPeer.getPeerId(), remotePeer.getPeerId(), pieceIndex);

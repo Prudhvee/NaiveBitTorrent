@@ -43,14 +43,15 @@ public class UnchokeScheduler extends TimerTask {
 			if (peer.hasFile() && hostPeer.hasFile()) {
 				neighbors.remove(peer);
 				try {
-						peer.getSoc().close();
+					peer.getSoc().close();
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 				continue;
+			} else {
+				list.add(peer);
 			}
-			list.add(peer);
 		}
 
 		// Get the first K neighbors
@@ -70,7 +71,7 @@ public class UnchokeScheduler extends TimerTask {
 					try {
 						peer.getService().sendMessage(msg);
 						// msg.sendMessage(peer.getOut());
-					} catch (IOException e) {
+					} catch (Exception e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
 					}
@@ -81,7 +82,7 @@ public class UnchokeScheduler extends TimerTask {
 						try {
 							peer.getService().sendMessage(msg);
 							// msg.sendMessage(peer.getOut());
-						} catch (IOException e) {
+						} catch (Exception e) {
 							// TODO Auto-generated catch block
 							e.printStackTrace();
 						}
@@ -94,7 +95,7 @@ public class UnchokeScheduler extends TimerTask {
 					try {
 						// msg.sendMessage(peer.getOut());
 						peer.getService().sendMessage(msg);
-					} catch (IOException e) {
+					} catch (Exception e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
 					}

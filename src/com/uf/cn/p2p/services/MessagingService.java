@@ -52,6 +52,12 @@ public class MessagingService {
 					LogUtil.logInfo("Socket exception received+++++++++++++++++++++++++" + e.getMessage());
 					break;
 				}
+				catch(Exception e)
+				{
+					e.printStackTrace();
+					break;
+				}
+
 
 				switch (message.getMessageType()) {
 				case choke:
@@ -93,6 +99,12 @@ public class MessagingService {
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
+				break;
+			}
+			catch(Exception e)
+			{
+				e.printStackTrace();
+				break;
 			}
 
 		}
@@ -100,7 +112,7 @@ public class MessagingService {
 		LogUtil.logInfo("Leaving the while loop " + remotePeer.getPeerId());
 	}
 
-	private Message readMessage(DataInputStream inStream) throws IOException, SocketException {
+	private Message readMessage(DataInputStream inStream) throws IOException, SocketException, Exception {
 		LogUtil.logInfo("reading 4 bytes from " + remotePeer.getPeerId());
 		Integer messageLength = inStream.readInt();
 		LogUtil.logInfo("read 4 bytes from " + remotePeer.getPeerId() + "---" + messageLength);
@@ -124,7 +136,7 @@ public class MessagingService {
 		return new Message(message, type_);
 	}
 
-	synchronized public void sendMessage(Message msg) throws IOException, SocketException {
+	synchronized public void sendMessage(Message msg) throws IOException, SocketException, Exception {
 		// messageLength = messagePayLoad.length + 1;
 		remotePeer.getOut().writeInt(msg.getMessageLength());
 		LogUtil.logInfo("Wriring the message " + msg.getMessageLength());
@@ -137,7 +149,7 @@ public class MessagingService {
 		remotePeer.getOut().flush();
 	}
 
-	public void sendBitField(BitSet hostBitSet) throws IOException {
+	public void sendBitField(BitSet hostBitSet) throws IOException, Exception {
 		Message bitFieldMsg = new Message(hostBitSet.isEmpty() ? null : hostBitSet.toByteArray(), MessageType.bitField);
 		// bitFieldMsg.sendMessage(out);
 		sendMessage(bitFieldMsg);

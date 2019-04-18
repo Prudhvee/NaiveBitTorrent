@@ -5,18 +5,15 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 
 import com.uf.cn.p2p.model.CommonConfigModel;
-import com.uf.cn.p2p.model.FilePiece;
 import com.uf.cn.p2p.model.Peer;
 
 public class FileUtil {
 
-	public static String path = System.getProperty("user.dir") + "/src/";
+	public static String path = System.getProperty("user.dir") + "/";
 
 	public static void MergeTheFileIfWeCan(Peer hostPeer) throws IOException {
 		// If the number of bits set in bitfield is equal to the filePieces.length,
@@ -50,7 +47,7 @@ public class FileUtil {
 
 		// System.getProperty("user.dir") + "/src/";
 		System.out.println("Breaking the file");
-		File file = new File(path + "/" + peerId + "/" + CommonConfigModel.getFileName());
+		File file = new File(path + "/peer_" + peerId + "/" + CommonConfigModel.getFileName());
 
 		System.out.println(file.toString());
 		FileInputStream fis = new FileInputStream(file);
@@ -65,7 +62,7 @@ public class FileUtil {
 					: fileLength];
 			int read = fis.read(pieceBytes);
 			fileLength -= read;
-			pieceName = path + "/" + peerId + "/" + "piece" + piece++;
+			pieceName = path + "/peer_" + peerId + "/" + "piece" + piece++;
 
 			fos = new FileOutputStream(new File(pieceName));
 
@@ -82,11 +79,11 @@ public class FileUtil {
 	}
 
 	public static Path getFilePath(Integer peerId, Integer piece) {
-		return Paths.get(path + "/" + peerId + "/" + "piece" + piece);
+		return Paths.get(path + "/peer_" + peerId + "/" + "piece" + piece);
 	}
 
 	public static String getDirectoryPath(Integer peerId) {
-		return path + "/" + peerId;
+		return path + "/peer_" + peerId;
 	}
 
 	public static void createDirectoryIfNotExists(Integer peerId) throws IOException {

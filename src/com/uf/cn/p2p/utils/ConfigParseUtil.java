@@ -15,7 +15,7 @@ public class ConfigParseUtil {
 		String str;
 		try {
 
-			BufferedReader in = new BufferedReader(new FileReader(path + "./src/" + "Common.cfg"));
+			BufferedReader in = new BufferedReader(new FileReader(path + "/" + "Common.cfg"));
 			while ((str = in.readLine()) != null) {
 				str = str.trim();
 				if ((str.length() <= 0) || (str.startsWith("#"))) {
@@ -57,7 +57,7 @@ public class ConfigParseUtil {
 		String st;
 		Integer index = 0;
 		try {
-			BufferedReader in = new BufferedReader(new FileReader(path + "./src/" + "PeerInfo.cfg"));
+			BufferedReader in = new BufferedReader(new FileReader(path + "/" + "PeerInfo.cfg"));
 			while ((st = in.readLine()) != null) {
 				String[] tokens = st.split("\\s+");
 				vec.addElement(new Peer(index++, Integer.parseInt(tokens[0]), tokens[1], Integer.parseInt(tokens[2]),

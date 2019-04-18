@@ -80,10 +80,15 @@ public class PeerListenerService extends Thread {
 
 		public Handler(Socket connection) {
 			this.connection = connection;
+			
 		}
 
 		public void run() {
 			try {
+				
+				//Start only if the hostName and port matches
+				if(!isHostAndPortMatched(allPeers, connection))
+					throw new Exception("Invalid hostname and port");
 
 				// initialize Input and Output streams
 				out = new DataOutputStream(connection.getOutputStream());
@@ -103,6 +108,7 @@ public class PeerListenerService extends Thread {
 				remote.setOut(out);
 				remote.setIn(in);
 				remote.setSoc(connection);
+				
 				// MessageUtil.sendBitField(out, hostPeer.getBitField());
 				neighbors.add(remote);
 				MessagingService msgService = new MessagingService(hostPeer, remote, neighbors);
@@ -112,7 +118,7 @@ public class PeerListenerService extends Thread {
 
 			} catch (IOException ioException) {
 				System.out.println("Disconnect with Client ");
-			} catch (InterruptedException e) {
+			} catch (Exception e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			} finally {
@@ -133,6 +139,21 @@ public class PeerListenerService extends Thread {
 				}
 			}
 		}
+		private boolean isHostAndPortMatched(Vector<Peer> allPeers, Socket conn) {
+			
+			String host = conn.getInetAddress().getHostName();
+			Integer port = conn.getPort();
+			for(Peer peer: allPeers)
+			{
+				if(host.equals(peer.getHostName()) && port.equals(peer.getPort()))
+				{
+					return true;
+				}
+			}
+				
+			return false;
+		}
+
 		/*
 		 * // send a message to the output stream public void sendMessage(String msg) {
 		 * try { // out.write(msg); out.flush(); System.out.println("Send message: " +

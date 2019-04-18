@@ -28,7 +28,7 @@ public class BroadcastHave extends Thread {
 			} catch (SocketException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
-			} catch (IOException e) {
+			} catch (Exception e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
